@@ -6,9 +6,7 @@ It also places customized yaml spec files on the bootstrap node to deploy px-ent
 ## 1. create Cloud Formation Stack
 If it not already exists you need to create a Tanzu cloud formation stack "tkg-cloud-vmware-com" in your AWS Account 
 
-'''
 `aws cloudformation create-stack --capabilities CAPABILITY_NAMED_IAM --stack-name tkg-cloud-vmware-com --template-body file://cloud-formation.json`
-''''
 
 If this not exists deployment will fail.
 
@@ -24,16 +22,18 @@ The role which credentials are used in the .tfvars file should have the followin
 ## 3. Create custom .tfvars file
 Minimum needed options in .tfvars:
 
-'''
+```
 access_key = "YOUR_AWS_ACCESS_KEY"
 secret_access_key = "YOUR_SECRET_AWS_KEY"
 deploy_key = "YOUR PRE-CREATED AWS SSH KEY"
 name_prefix = "naming prefix for all elements"
-''''
+```
 
 ## 4. Run terraform
 `terraform plan -var-file .yourvarfile`
+
 `terrform apply -var-file .yourvarfile`
+
 when finished you can ssh into the bootstrap vm (for IP see terraform output)
 
 deployment of management & guest cluster will take some time
