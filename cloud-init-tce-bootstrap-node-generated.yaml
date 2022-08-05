@@ -1,0 +1,320 @@
+#cloud-config
+write_files:
+  - content: |
+      [default]
+      aws_access_key_id = AKIAURYOBGW7E5QL4KBG
+      aws_secret_access_key = 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
+    path: /home/ec2-user/.aws/credentials
+    permissions: '0600'
+  - content: |
+      [default]
+      region = eu-west-1
+    path: /home/ec2-user/.aws/config
+    permissions: '0600'
+  # this is the tanzu delete script which will be placed on node
+  - content: |
+      #!/bin/bash
+      export AWS_ACCESS_KEY_ID=AKIAURYOBGW7E5QL4KBG
+      export AWS_SECRET_ACCESS_KEY=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
+      export AWS_REGION=eu-west-1
+      
+      # delete all deployed guest clusters and wait until finished
+      echo "deleting all guest cluster(s). this can take more than 5min"
+      for cluster in $(tanzu cluster list -o json |jq -r '.[] | .name'); do
+        tanzu cluster delete ${cluster} -y
+      done
+      
+      COUNT=$(tanzu cluster list -o json |jq -r '.[] | .name'| wc -l)
+      while [[ $COUNT != 0 ]]; do
+        #tanzu cluster list -o json |jq -r '.[] | .name, .status'
+        echo "still $COUNT cluster(s) online, wait 30 sec. You can check details with 'tanzu cluster list'"
+        sleep 30
+        COUNT=$(tanzu cluster list -o json |jq -r '.[] | .name'| wc -l)
+      done
+      echo "guest cluster(s) deleted."
+      echo "deleting mangement cluster"
+      tanzu management-cluster delete dpaul-tce-mgmt -y
+      # delete all non-attached px volumes with tag PWX_CLUSTER_ID / dpaul-px-cluster
+      VOLUMES=$(aws ec2 describe-volumes --filters Name=status,Values=available Name=tag:PWX_CLUSTER_ID,Values=dpaul-px-cluster --query 'Volumes[*].{a:VolumeId}' --output text)
+      for i in $VOLUMES; do
+        aws ec2 delete-volume --volume-id $i
+      done
+    path: /home/ec2-user/delete-all-tanzu.sh
+    permissions: '0700'
+  # this is the management cluster config yaml file
+  - content: |
+      AWS_AMI_ID: ami-033386f1ece25ae99
+      AWS_B64ENCODED_CREDENTIALS: W2RlZmF1bHRdCmF3c19hY2Nlc3Nfa2V5X2lkID0gQUtJQVVSWU9CR1c3RTVRTDRLQkcKYXdzX3NlY3JldF9hY2Nlc3Nfa2V5ID0gL2NLL2JObnlsWCsvRmxWTTJvb0ZSNG4vTWVDdUhjcFdXUVBYTkUybgpyZWdpb24gPSBldS13ZXN0LTEKCg==
+      AWS_NODE_AZ: eu-west-1a
+      AWS_NODE_AZ_1: ""
+      AWS_NODE_AZ_2: ""
+      AWS_PRIVATE_NODE_CIDR: 172.30.2.0/24
+      AWS_PRIVATE_NODE_CIDR_1: ""
+      AWS_PRIVATE_NODE_CIDR_2: ""
+      AWS_PRIVATE_SUBNET_ID: subnet-0c6797b4a4081fb28
+      AWS_PRIVATE_SUBNET_ID_1: ""
+      AWS_PRIVATE_SUBNET_ID_2: ""
+      AWS_PROFILE: default
+      AWS_PUBLIC_NODE_CIDR: 172.30.1.0/24
+      AWS_PUBLIC_NODE_CIDR_1: ""
+      AWS_PUBLIC_NODE_CIDR_2: ""
+      AWS_PUBLIC_SUBNET_ID: subnet-0957b77c8a8c1e2c3
+      AWS_PUBLIC_SUBNET_ID_1: ""
+      AWS_PUBLIC_SUBNET_ID_2: ""
+      AWS_REGION: eu-west-1
+      AWS_SSH_KEY_NAME: dpaul-key
+      AWS_VPC_CIDR: 172.30.0.0/16
+      AWS_VPC_ID: vpc-00a111c40a1c7b86f
+      BASTION_HOST_ENABLED: "false"
+      CLUSTER_CIDR: 100.96.0.0/11
+      CLUSTER_NAME: dpaul-tce-mgmt
+      CLUSTER_PLAN: dev
+      CONTROL_PLANE_MACHINE_TYPE: t3.small
+      NODE_MACHINE_TYPE: t3.large
+      ENABLE_AUDIT_LOGGING: ""
+      ENABLE_CEIP_PARTICIPATION: "false"
+      ENABLE_MHC: "true"
+      IDENTITY_MANAGEMENT_TYPE: none
+      INFRASTRUCTURE_PROVIDER: aws
+      LDAP_BIND_DN: ""
+      LDAP_BIND_PASSWORD: ""
+      LDAP_GROUP_SEARCH_BASE_DN: ""
+      LDAP_GROUP_SEARCH_FILTER: ""
+      LDAP_GROUP_SEARCH_GROUP_ATTRIBUTE: ""
+      LDAP_GROUP_SEARCH_NAME_ATTRIBUTE: cn
+      LDAP_GROUP_SEARCH_USER_ATTRIBUTE: DN
+      LDAP_HOST: ""
+      LDAP_ROOT_CA_DATA_B64: ""
+      LDAP_USER_SEARCH_BASE_DN: ""
+      LDAP_USER_SEARCH_FILTER: ""
+      LDAP_USER_SEARCH_NAME_ATTRIBUTE: ""
+      LDAP_USER_SEARCH_USERNAME: userPrincipalName
+      OIDC_IDENTITY_PROVIDER_CLIENT_ID: ""
+      OIDC_IDENTITY_PROVIDER_CLIENT_SECRET: ""
+      OIDC_IDENTITY_PROVIDER_GROUPS_CLAIM: ""
+      OIDC_IDENTITY_PROVIDER_ISSUER_URL: ""
+      OIDC_IDENTITY_PROVIDER_NAME: ""
+      OIDC_IDENTITY_PROVIDER_SCOPES: ""
+      OIDC_IDENTITY_PROVIDER_USERNAME_CLAIM: ""
+      OS_ARCH: amd64
+      OS_NAME: amazon
+      OS_VERSION: "2"
+      SERVICE_CIDR: 100.64.0.0/13
+      TKG_HTTP_PROXY_ENABLED: "false"
+    path: /home/ec2-user/management-cluster-config.yaml
+    permissions: '0600'
+  # this is the guest cluster config yaml file
+  - content: |
+      CLUSTER_PLAN: dev
+      NAMESPACE: default
+      CLUSTER_NAME: dpaul-tce-guest
+      CNI: antrea
+      CONTROL_PLANE_MACHINE_TYPE: t3.small
+      NODE_MACHINE_TYPE: t3.large
+      CONTROL_PLANE_MACHINE_COUNT: 1
+      WORKER_MACHINE_COUNT: 3
+      AWS_REGION: eu-west-1
+      AWS_NODE_AZ: eu-west-1a
+      AWS_SSH_KEY_NAME: dpaul-key
+      AWS_PRIVATE_NODE_CIDR: 172.30.2.0/24
+      AWS_PRIVATE_SUBNET_ID: subnet-0c6797b4a4081fb28
+      AWS_PUBLIC_NODE_CIDR: 172.30.1.0/24
+      AWS_PUBLIC_SUBNET_ID: subnet-0957b77c8a8c1e2c3
+      AWS_VPC_CIDR: 172.30.0.0/16
+      AWS_VPC_ID: vpc-00a111c40a1c7b86f
+      BASTION_HOST_ENABLED: false
+      ENABLE_MHC: true
+      MHC_UNKNOWN_STATUS_TIMEOUT: 5m
+      MHC_FALSE_STATUS_TIMEOUT: 12m
+      ENABLE_AUDIT_LOGGING: false
+      ENABLE_DEFAULT_STORAGE_CLASS: true
+      CLUSTER_CIDR: 100.96.0.0/11
+      SERVICE_CIDR: 100.64.0.0/13
+      ENABLE_AUTOSCALER: false
+      ENABLE_CEIP_PARTICIPATION: "false"
+      INFRASTRUCTURE_PROVIDER: aws
+      OS_ARCH: amd64
+      OS_NAME: amazon
+      OS_VERSION: "2"
+      AWS_SECURITY_GROUP_BASTION: sg-0f6ae4ba2888efe69
+      AWS_SECURITY_GROUP_NODE: sg-0f978fa48f762d233
+      AWS_SECURITY_GROUP_CONTROLPLANE: sg-0a1bed4f2e2f7aad5
+      AWS_SECURITY_GROUP_APISERVER_LB: sg-08207b7f2bcb527b5
+    path: /home/ec2-user/guest-cluster-config.yaml
+    permissions: '0600'
+  # this is the management cluster creation script
+  - content: |
+     #!/bin/bash
+     export PATH=$PATH:/usr/local/bin
+     /usr/local/bin/tanzu management-cluster create dpaul-tce-mgmt -f /home/ec2-user/management-cluster-config.yaml -v6 --log-file /home/ec2-user/dpaul-tce-mgmt.log
+     echo "Access to mgmt cluster: kubectl config use-context dpaul-tce-mgmt-admin@dpaul-tce-mgmt" >> /home/ec2-user/README.txt
+    path: /home/ec2-user/create_mgmt_cluster.sh
+    permissions: '0700'
+  # this is the guest cluster creation script
+  - content: |
+     #!/bin/bash
+     export PATH=$PATH:/usr/local/bin
+     /usr/local/bin/tanzu cluster create dpaul-tce-guest -f /home/ec2-user/guest-cluster-config.yaml -v6 --log-file /home/ec2-user/dpaul-tce-guest.log
+     /usr/local/bin/tanzu cluster kubeconfig get dpaul-tce-guest --admin
+     /usr/local/bin/kubectl config use-context dpaul-tce-guest-admin@dpaul-tce-guest
+     echo "Access to guest cluster: kubectl config use-context dpaul-tce-guest-admin@dpaul-tce-guest" >> /home/ec2-user/README.txt
+    path: /home/ec2-user/create_guest_cluster.sh
+    permissions: '0700'
+  # this is the portworx cluster spec yaml file
+  - content: |
+      kind: StorageCluster
+      apiVersion: core.libopenstorage.org/v1
+      metadata:
+        name: dpaul-px-cluster
+        namespace: kube-system
+        annotations:
+      spec:
+        image: portworx/oci-monitor:2.11.1
+        imagePullPolicy: Always
+        kvdb:
+          internal: true
+        cloudStorage:
+          deviceSpecs:
+          - type=gp2,size=150
+          kvdbDeviceSpec: type=gp2,size=150
+        secretsProvider: k8s
+        stork:
+          enabled: true
+          args:
+            webhook-controller: "true"
+        autopilot:
+          enabled: true
+        csi:
+          enabled: true
+        monitoring:
+          prometheus:
+            enabled: true
+            exportMetrics: true
+        env:
+        - name: "AWS_ACCESS_KEY_ID"
+          value: "AKIAURYOBGW7E5QL4KBG"
+        - name: "AWS_SECRET_ACCESS_KEY"
+          value: "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"
+    path: /home/ec2-user/portworx-spec.yaml
+    permissions: '0600'
+    # this is the portworx operator yaml file
+  - content: |
+      # SOURCE: https://install.portworx.com/?comp=pxoperator
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: portworx-operator
+        namespace: kube-system
+      ---
+      apiVersion: policy/v1beta1
+      kind: PodSecurityPolicy
+      metadata:
+        name: px-operator
+      spec:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false
+        volumes:
+        - secret
+        runAsUser:
+          rule: 'RunAsAny'
+        seLinux:
+          rule: 'RunAsAny'
+        supplementalGroups:
+          rule: 'RunAsAny'
+        fsGroup:
+          rule: 'RunAsAny'
+      ---
+      kind: ClusterRole
+      apiVersion: rbac.authorization.k8s.io/v1
+      metadata:
+        name: portworx-operator
+      rules:
+        - apiGroups: ["*"]
+          resources: ["*"]
+          verbs: ["*"]
+        - apiGroups: ["policy"]
+          resources: ["podsecuritypolicies"]
+          resourceNames: ["px-operator"]
+          verbs: ["use"]
+      ---
+      kind: ClusterRoleBinding
+      apiVersion: rbac.authorization.k8s.io/v1
+      metadata:
+        name: portworx-operator
+      subjects:
+      - kind: ServiceAccount
+        name: portworx-operator
+        namespace: kube-system
+      roleRef:
+        kind: ClusterRole
+        name: portworx-operator
+        apiGroup: rbac.authorization.k8s.io
+      ---
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: portworx-operator
+        namespace: kube-system
+      spec:
+        strategy:
+          rollingUpdate:
+            maxSurge: 1
+            maxUnavailable: 1
+          type: RollingUpdate
+        replicas: 1
+        selector:
+          matchLabels:
+            name: portworx-operator
+        template:
+          metadata:
+            labels:
+              name: portworx-operator
+          spec:
+            containers:
+            - name: portworx-operator
+              imagePullPolicy: Always
+              image: portworx/px-operator:1.8.1
+              command:
+              - /operator
+              - --verbose
+              - --driver=portworx
+              - --leader-elect=true
+              env:
+              - name: OPERATOR_NAME
+                value: portworx-operator
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+            affinity:
+              podAntiAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  - labelSelector:
+                      matchExpressions:
+                        - key: "name"
+                          operator: In
+                          values:
+                          - portworx-operator
+                    topologyKey: "kubernetes.io/hostname"
+            serviceAccountName: portworx-operator
+    path: /home/ec2-user/portworx-operator.yaml
+    permissions: '0600'
+
+runcmd:
+- yum install docker jq -y
+- systemctl enable docker
+- systemctl start docker
+- curl -LO https://dl.k8s.io/release/v1.24.3/bin/linux/amd64/kubectl
+- install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+- usermod -aG docker ec2-user
+- wget https://github.com/vmware-tanzu/community-edition/releases/download/v0.12.1/tce-linux-amd64-v0.12.1.tar.gz -P /home/ec2-user/
+- tar xzvf /home/ec2-user/tce-linux-amd64-v0.12.1.tar.gz -C /home/ec2-user/
+- chown -R ec2-user.ec2-user /home/ec2-user
+- sudo -u ec2-user /home/ec2-user/tce-linux-amd64-v0.12.1/install.sh
+- sudo -u ec2-user /usr/local/bin/tanzu init
+- sudo -u ec2-user /home/ec2-user/create_mgmt_cluster.sh
+- sudo -u ec2-user /home/ec2-user/create_guest_cluster.sh
+- sudo -u ec2-user /usr/local/bin/kubectl apply -f /home/ec2-user/portworx-operator.yaml
+#- sudo -u ec2-user /usr/local/bin/kubectl apply -f /home/ec2-user/portworx-spec.yaml
+- sudo -u ec2-user touch /home/ec2-user/complete
+#tanzu management-cluster permissions aws set -f ./config.yaml  -> these roles should be applied to userrole
