@@ -25,7 +25,7 @@ Minimum needed options in .tfvars:
 ```
 access_key = "YOUR_AWS_ACCESS_KEY"
 secret_access_key = "YOUR_SECRET_AWS_KEY"
-deploy_key = "YOUR PRE-CREATED AWS SSH KEY"
+deploy_key = "existing AWS key pair name"
 name_prefix = "naming prefix for all elements"
 ```
 
@@ -34,14 +34,15 @@ name_prefix = "naming prefix for all elements"
 
 `terrform apply -var-file .yourvarfile`
 
-when finished you can ssh into the bootstrap vm (for IP see terraform output)
+when finished you can ssh into the bootstrap VM (for IP see terraform output)
 
-deployment of management & guest cluster will take some time
+Deployment of management & guest cluster will take some time
 
-take a look into the `*-tce-mgmt.log` and `*-tce-guest.log` files. When init script is finished a file named `complete` will be created. 
+You can follow the deployment in `*-tce-mgmt.log` and `*-tce-guest.log` files. When init script is finished a file named `complete` will be created. 
 
 Now you can create the portworx cluster. Sample yaml specs including your aws credentials (to create cloud drives) are placed in the home directory
 
 ## 5. Destroy Infrastructure
-Before running `terrform destroy` you need to login to the bootstrap node and run the 'delete-all-tanzu.sh' script. 
+Before running `terrform destroy` you need to login to the bootstrap node and run the `delete-all-tanzu.sh` script. 
+
 This deletes the Tanzu Guest/Management Cluster, removes all Tanzu created AWS elements (e.g. Loadbalancer) and the EBS portworx cloud drives.
