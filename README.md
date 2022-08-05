@@ -30,6 +30,8 @@ name_prefix = "naming prefix for all elements"
 ```
 
 ## 4. Run terraform
+`terraform init`
+
 `terraform plan -var-file .yourvarfile`
 
 `terrform apply -var-file .yourvarfile`
