@@ -1,10 +1,14 @@
 This terraform script deploys a bootstrap vm in AWS EC2 and then deploys a Tanzu Community Edition (TCE) Management Cluster and a TCE Guest Cluster
-It also places yaml spec files on the bootstrap node to deploy px-enterprise
+
+It also places customized yaml spec files on the bootstrap node to deploy px-enterprise
 
 
 ## 1. create Cloud Formation Stack
 If it not already exists you need to create a Tanzu cloud formation stack "tkg-cloud-vmware-com" in your AWS Account 
-'aws cloudformation create-stack --capabilities CAPABILITY_NAMED_IAM --stack-name tkg-cloud-vmware-com --template-body file://cloud-formation.json'
+
+'''
+`aws cloudformation create-stack --capabilities CAPABILITY_NAMED_IAM --stack-name tkg-cloud-vmware-com --template-body file://cloud-formation.json`
+''''
 
 If this not exists deployment will fail.
 
@@ -28,12 +32,16 @@ name_prefix = "naming prefix for all elements"
 ''''
 
 ## 4. Run terraform
-'terraform plan -var-file .yourvarfile'
-'terrform apply -var-file .yourvarfile'
+`terraform plan -var-file .yourvarfile`
+`terrform apply -var-file .yourvarfile`
 when finished you can ssh into the bootstrap vm (for IP see terraform output)
+
 deployment of management & guest cluster will take some time
-take a look into the '*-tce-mgmt.log' and '*-tce-guest.log' files. When init script is finished a file named 'complete' will be created. 
+
+take a look into the `*-tce-mgmt.log` and `*-tce-guest.log` files. When init script is finished a file named `complete` will be created. 
+
 Now you can create the portworx cluster. Sample yaml specs including your aws credentials (to create cloud drives) are placed in the home directory
 
 ## 5. Destroy Infrastructure
-Before running 'terrform destroy' you need to login to the bootstrap node and run the 'delete-all-tanzu.sh' script. This deletes the Tanzu Guest/Management Cluster, removes all Tanzu created AWS elements (e.g. Loadbalancer) and the EBS portworx cloud drives.
+Before running `terrform destroy` you need to login to the bootstrap node and run the 'delete-all-tanzu.sh' script. 
+This deletes the Tanzu Guest/Management Cluster, removes all Tanzu created AWS elements (e.g. Loadbalancer) and the EBS portworx cloud drives.
