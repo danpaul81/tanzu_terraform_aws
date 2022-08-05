@@ -38,7 +38,6 @@ variable "aws_ami_image" {
 	#default 	= "ami-0d75513e7706cf2d9"  # Ubuntu 22.04 LTS image
 	#default 	= "ami-0d2a4a5d69e46ea0b"  # Ubuntu 20.04 LTS image
 	default = "ami-0d71ea30463e0ff8d" #amazon linux x64 eu-west
-	//default = "ami-098e42ae54c764c35" #amazon linux x64 us-west
 }
 
 variable "aws_instance_type" {
@@ -47,19 +46,11 @@ variable "aws_instance_type" {
 	default 	= "t2.large"
 }
 
-
 variable "aws_cidr_vpc" {
 	description ="CIDR block for VPC"
 	type		= string
 	default 	= "172.30.0.0/16"
 }
-
-variable "aws_tag_vpc" {
-	description ="VPC Name Tag"
-	type		= string
-	default 	= "dpaul_AWS_VPC"
-}
-
 
 variable "aws_cidr_sn_private" {
 	description ="CIDR block for private Subnet"
