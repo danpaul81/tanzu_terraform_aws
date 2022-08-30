@@ -45,6 +45,6 @@ You can follow the deployment in `*-tce-mgmt.log` and `*-tce-guest.log` files. W
 Now you can create the portworx cluster. Sample yaml specs including your aws credentials (to create cloud drives) are placed in the home directory
 
 ## 5. Destroy Infrastructure
-Before running `terrform destroy` you need to login to the bootstrap node and run the `delete-all-tanzu.sh` script. 
+Before running `terraform destroy` you need to login to the bootstrap node and run the `delete-all-tanzu.sh` script. 
 
 This deletes the Tanzu Guest/Management Cluster, removes all Tanzu created AWS elements (e.g. Loadbalancer) and the EBS portworx cloud drives.
