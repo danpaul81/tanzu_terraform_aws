@@ -44,6 +44,9 @@ You can follow the deployment in `*-tce-mgmt.log` and `*-tce-guest.log` files. W
 
 Now you can create the portworx cluster. Sample yaml specs including your aws credentials (to create cloud drives) are placed in the home directory
 
+## 5. Create Portworx Spec
+When creating the portworx Spec select Cloud AWS and set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY Environment Variables with the according settings
+
 ## 5. Destroy Infrastructure
 Login to the bootstrap node and run the `delete-all-tanzu.sh` script
 
