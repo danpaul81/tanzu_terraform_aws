@@ -34,7 +34,7 @@ name_prefix = "naming prefix for all elements"
 
 `terraform plan -var-file .yourvarfile`
 
-`terrform apply -var-file .yourvarfile`
+`terraform apply -var-file .yourvarfile`
 
 when finished you can ssh into the bootstrap VM (for IP see terraform output)
 
