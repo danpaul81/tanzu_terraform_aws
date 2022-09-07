@@ -279,6 +279,7 @@ resource "local_file" "cloud_init_bootstrap_node" {
 	tpl-secret-access-key = var.secret_access_key
 	tpl-region = var.aws_region
 	tpl-prefix = var.name_prefix
+	tpl-license = var.px_license
 	tpl-mgmt-name = format("%s-tce-mgmt",var.name_prefix)
 	tpl-guest-name = format("%s-tce-guest",var.name_prefix)
 	tpl-management-config-yaml = local.tce_management_config_yaml_lines

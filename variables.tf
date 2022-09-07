@@ -26,6 +26,18 @@ variable "aws_region" {
 	default 	= "eu-west-1"
 }
 
+variable "px_license" {
+	description ="PX DR License"
+	type		= string
+	default 	= ""
+}
+
+variable "dr_bucket" {
+   description 	= "s3 bucket for DR"
+   type 		= string
+   default 		= ""
+}
+
 variable "aws_az" {
 	description ="AWS AZ"
 	type		= string

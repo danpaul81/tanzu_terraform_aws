@@ -7,6 +7,30 @@ write_files:
     path: /home/ec2-user/.aws/credentials
     permissions: '0600'
   - content: |
+      #!/bin/bash
+      export PATH=$PATH:/usr/local/bin
+      # create portworx ns
+      kubectl create namespace portworx
+      # install operator
+      kubectl apply -f /home/ec2-user/portworx-operator.yaml
+      # wait for operator pod ready
+      while ! kubectl wait --for=condition=ready pod -lname=portworx-operator -n kube-system; do
+        sleep 2 
+      done
+      # install portworx spec
+      kubectl apply -f /home/ec2-user/portworx-spec.yaml
+      # wait for portworx stc ready
+      while ! kubectl wait stc ${tpl-px-clustername} -nportworx --for=jsonpath='{.status.phase}'=Online; do
+        sleep 2
+      done
+      #install license
+      export license="${tpl-license}"
+      if [ ! -z $license ]; then
+        kubectl pxc pxctl license add {$tpl-license}
+      fi
+    path: /home/ec2-user/install_px.sh
+    permissions: '0700'
+  - content: |
       [default]
       region = ${tpl-region}
     path: /home/ec2-user/.aws/config
@@ -74,11 +98,11 @@ write_files:
   - content: |
      #!/bin/bash
      export PATH=$PATH:/usr/local/bin
-     /usr/local/bin/tanzu cluster create ${tpl-guest-name} -f /home/ec2-user/guest-cluster-config.yaml -v6 --log-file /home/ec2-user/${tpl-guest-name}.log
+     /usr/local/bin/tanzu cluster create ${tpl-guest-name} -f /home/ec2-user/guest-cluster-1-config.yaml -v6 --log-file /home/ec2-user/${tpl-guest-name}-1.log
      /usr/local/bin/tanzu cluster kubeconfig get ${tpl-guest-name} --admin
      /usr/local/bin/kubectl config use-context ${tpl-guest-name}-admin@${tpl-guest-name}
      echo "Access to guest cluster: kubectl config use-context ${tpl-guest-name}-admin@${tpl-guest-name}" >> /home/ec2-user/README.txt
-    path: /home/ec2-user/create_guest_cluster.sh
+    path: /home/ec2-user/create_guest_cluster_1.sh
     permissions: '0700'
   # this is the portworx cluster spec yaml file
   - content: |
@@ -107,12 +131,12 @@ runcmd:
 - curl -so /usr/local/bin/pxc-pxctl https://raw.githubusercontent.com/portworx/pxc/master/component/pxctl/pxc-pxctl
 - mv /tmp/pxc/kubectl-pxc /usr/bin
 - chmod +x /usr/local/bin/pxc-pxctl
-- echo "alias pxctl='kubectl pxc pxctl'" >>/home/ec2-user/.bashrc
-- echo "alias k=kubectl" >>/home/ec2-user/.bashrc
+- echo "alias pxctl='kubectl pxc pxctl'" >>/home/ec2-user/.bash_profile
+- echo "alias k=kubectl" >>/home/ec2-user/.bash_profile
 # setup storkctl
-- stork_image=$(curl -sk https://install.portworx.com/$px_version?comp=stork | awk '/image: openstorage.stork/{print$2}')
-- id=$(docker create $stork_image)
-- docker cp $id:/storkctl/linux/storkctl /usr/bin
+#- stork_image=$(curl -sk https://install.portworx.com/$px_version?comp=stork | awk '/image: openstorage.stork/{print$2}')
+#- id=$(docker create $stork_image)
+#- docker cp $id:/storkctl/linux/storkctl /usr/bin
 # download tce
 - wget https://github.com/vmware-tanzu/community-edition/releases/download/v0.12.1/tce-linux-amd64-v0.12.1.tar.gz -P /home/ec2-user/
 - tar xzvf /home/ec2-user/tce-linux-amd64-v0.12.1.tar.gz -C /home/ec2-user/
@@ -121,7 +145,8 @@ runcmd:
 - sudo -u ec2-user /home/ec2-user/tce-linux-amd64-v0.12.1/install.sh
 - sudo -u ec2-user /usr/local/bin/tanzu init
 - sudo -u ec2-user /home/ec2-user/create_mgmt_cluster.sh
-- sudo -u ec2-user /home/ec2-user/create_guest_cluster.sh
+- sudo -u ec2-user /home/ec2-user/create_guest_cluster_1.sh
+- sudo -u ec2-user /home/ec2-user/install_px.sh
 #- sudo -u ec2-user /usr/local/bin/kubectl apply -f /home/ec2-user/portworx-operator.yaml
 #- sudo -u ec2-user /usr/local/bin/kubectl apply -f /home/ec2-user/portworx-spec.yaml
 - sudo -u ec2-user touch /home/ec2-user/complete
