@@ -48,12 +48,19 @@ write_files:
 %{ endfor ~}
     path: /home/ec2-user/management-cluster-config.yaml
     permissions: '0600'
-  # this is the guest cluster config yaml file
+  # this is the guest cluster 1 config yaml file
   - content: |
-%{ for line in tpl-guest-config-yaml ~}
+%{ for line in tpl-guest-config-1-yaml ~}
       ${line}
 %{ endfor ~}
-    path: /home/ec2-user/guest-cluster-config.yaml
+    path: /home/ec2-user/guest-cluster-1-config.yaml
+    permissions: '0600'
+  # this is the guest cluster 2 config yaml file
+  - content: |
+%{ for line in tpl-guest-config-2-yaml ~}
+      ${line}
+%{ endfor ~}
+    path: /home/ec2-user/guest-cluster-2-config.yaml
     permissions: '0600'
   # this is the management cluster creation script
   - content: |

@@ -1,0 +1,52 @@
+#!/bin/bash
+export PATH=$PATH:/usr/local/bin
+
+# create portworx ns
+kubectl create namespace portworx
+
+# install operator
+kubectl apply -f /home/ec2-user/portworx-operator.yaml
+
+# wait for operator pod ready
+while ! kubectl wait --for=condition=ready pod -lname=portworx-operator -n kube-system; do
+  sleep 2
+done
+
+# install portworx spec
+kubectl apply -f /home/ec2-user/portworx-spec.yaml
+
+# wait for portworx stc ready
+while ! kubectl wait stc dpaul-px-cluster -nportworx --for=jsonpath='{.status.phase}'=Online; do
+ sleep 2
+done
+
+#install license
+license=""
+if [ ! -z $license ]; then
+  kubectl pxc pxctl license add {$tpl_license}
+fi
+
+
+
+# prepare destination cluster
+kubectl annotate stc dpaul-px-cluster -n portworx portworx.io/service-type="LoadBalancer" --overwrite
+
+# get destination cluster uuid
+UUID=$(kubectl get stc -n portworx -o jsonpath='{.items[].status.clusterUid}')
+
+# create s3 secret
+kubectl pxc pxctl credentials create --provider s3 --s3-access-key $AWS_ACCESS_KEY --s3-secret-key $AWS_SECRET_KEY --s3-region $BUCKET_REGION --s3-endpoint s3.$BUCKET_REGION.amazonaws.com --s3-storage-class STANDARD --bucket $DR_BUCKET clusterPair_$UUID
+
+# get cluster token
+token=$(kubectl pxc pxctl cluster token show | cut -f3 -d " ")
+
+while : ;do
+    host=$(kubectl get svc -n portworx portworx-service -o jsonpath='{.status.loadBalancer.ingress[].ip}')
+    [ "$host" ] && break
+    sleep 1
+done
+
+# generate clusterpair spec
+storkctl generate clusterpair -n kube-system remotecluster-1 | sed "/insert_storage_options_here/c\    ip: $host\n    token: $token\n    mode: DisasterRecovery" >/home/ec2-user/cp.yaml
+
+
