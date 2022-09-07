@@ -2,7 +2,7 @@ kind: StorageCluster
 apiVersion: core.libopenstorage.org/v1
 metadata:
   name: ${tpl-px-clustername}
-  namespace: kube-system
+  namespace: portworx
   annotations:
 spec:
   image: portworx/oci-monitor:2.11.1

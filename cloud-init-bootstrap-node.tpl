@@ -95,14 +95,27 @@ runcmd:
 - curl -LO https://dl.k8s.io/release/v1.24.3/bin/linux/amd64/kubectl
 - install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 - usermod -aG docker ec2-user
+# setup pxctl
+- curl -sL https://github.com/portworx/pxc/releases/download/v0.33.0/pxc-v0.33.0.linux.amd64.tar.gz | tar xvz -C /tmp
+- curl -so /usr/local/bin/pxc-pxctl https://raw.githubusercontent.com/portworx/pxc/master/component/pxctl/pxc-pxctl
+- mv /tmp/pxc/kubectl-pxc /usr/bin
+- chmod +x /usr/local/bin/pxc-pxctl
+- echo "alias pxctl='kubectl pxc pxctl'" >>/home/ec2-user/.bashrc
+- echo "alias k=kubectl" >>/home/ec2-user/.bashrc
+# setup storkctl
+- stork_image=$(curl -sk https://install.portworx.com/$px_version?comp=stork | awk '/image: openstorage.stork/{print$2}')
+- id=$(docker create $stork_image)
+- docker cp $id:/storkctl/linux/storkctl /usr/bin
+# download tce
 - wget https://github.com/vmware-tanzu/community-edition/releases/download/v0.12.1/tce-linux-amd64-v0.12.1.tar.gz -P /home/ec2-user/
 - tar xzvf /home/ec2-user/tce-linux-amd64-v0.12.1.tar.gz -C /home/ec2-user/
 - chown -R ec2-user.ec2-user /home/ec2-user
+- sudo -u ec2-user /usr/bin/kubectl-pxc config cluster set --portworx-service-namespace=portworx
 - sudo -u ec2-user /home/ec2-user/tce-linux-amd64-v0.12.1/install.sh
 - sudo -u ec2-user /usr/local/bin/tanzu init
 - sudo -u ec2-user /home/ec2-user/create_mgmt_cluster.sh
 - sudo -u ec2-user /home/ec2-user/create_guest_cluster.sh
-- sudo -u ec2-user /usr/local/bin/kubectl apply -f /home/ec2-user/portworx-operator.yaml
+#- sudo -u ec2-user /usr/local/bin/kubectl apply -f /home/ec2-user/portworx-operator.yaml
 #- sudo -u ec2-user /usr/local/bin/kubectl apply -f /home/ec2-user/portworx-spec.yaml
 - sudo -u ec2-user touch /home/ec2-user/complete
 #tanzu management-cluster permissions aws set -f ./config.yaml  -> these roles should be applied to userrole
