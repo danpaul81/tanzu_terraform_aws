@@ -1,6 +1,5 @@
 CLUSTER_PLAN: dev
 NAMESPACE: default
-CLUSTER_NAME: ${tpl-name}
 CNI: antrea
 CONTROL_PLANE_MACHINE_TYPE: t3.small
 NODE_MACHINE_TYPE: t3.large

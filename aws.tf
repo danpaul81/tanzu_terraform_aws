@@ -161,7 +161,7 @@ resource "local_file" "tce_management_config_yaml" {
 }
 
 # create guest cluster 1 config.yaml file 
-resource "local_file" "tce_guest_config_1_yaml" {
+resource "local_file" "tce_guest_config_yaml" {
 	content = templatefile("${path.module}/tanzu-guest-cluster-config.tpl", { 
 	#tpl-credentials = base64encode(format("[default]\naws_access_key_id = %s\naws_secret_access_key = %s\nregion = %s\n\n", var.access_key, var.secret_access_key, var.aws_region))
 	tpl-priv-subnet-id = aws_subnet.sn_private.id
@@ -177,36 +177,11 @@ resource "local_file" "tce_guest_config_1_yaml" {
 	tpl-sg-node = aws_security_group.sg_tce_guest_node.id 
 	tpl-sg-controlplane = aws_security_group.sg_tce_guest_controlplane.id
 	tpl-sg-apiserver-lb =  aws_security_group.sg_tce_guest_apiserver-lb.id
-	tpl-name = format("%s-tce-guest-1",var.name_prefix)
+	#tpl-name = format("%s-tce-guest-1",var.name_prefix)
 	}
 	)
-	filename = "${path.module}/generated/tanzu-guest-cluster-1-config.yaml"
+	filename = "${path.module}/generated/tanzu-guest-cluster-config.yaml"
 }
-
-# create guest cluster 1 config.yaml file 
-resource "local_file" "tce_guest_config_2_yaml" {
-	content = templatefile("${path.module}/tanzu-guest-cluster-config.tpl", { 
-	#tpl-credentials = base64encode(format("[default]\naws_access_key_id = %s\naws_secret_access_key = %s\nregion = %s\n\n", var.access_key, var.secret_access_key, var.aws_region))
-	tpl-priv-subnet-id = aws_subnet.sn_private.id
-	tpl-pub-subnet-id = aws_subnet.sn_public.id
-	tpl-key = var.deploy_key
-	tpl-vpc = aws_vpc.main.id
-	tpl-region = var.aws_region
-	tpl-az = var.aws_az
-	tpl-cidr-sn-priv = var.aws_cidr_sn_private
-	tpl-cidr-sn-pub = var.aws_cidr_sn_public
-	tpl-cidr-vpc = var.aws_cidr_vpc
-	tpl-sg-bastion = aws_security_group.sg_tce_guest_bastion.id
-	tpl-sg-node = aws_security_group.sg_tce_guest_node.id 
-	tpl-sg-controlplane = aws_security_group.sg_tce_guest_controlplane.id
-	tpl-sg-apiserver-lb =  aws_security_group.sg_tce_guest_apiserver-lb.id
-	tpl-name = format("%s-tce-guest-2",var.name_prefix)
-	}
-	)
-	filename = "${path.module}/generated/tanzu-guest-cluster-2-config.yaml"
-}
-
-
 
 # re-read management_config.yaml file line-by line, remove line breaks and store in array
 # template file will read each line and print with fitting spaces to keep resulting yaml valid
@@ -220,18 +195,12 @@ resource "local_file" "tce_guest_config_2_yaml" {
 # re-read guest_config.yaml file line-by line, remove line breaks and store in array
 # template file will read each line and print with fitting spaces to keep resulting yaml valid
  locals {
-	tce_guest_config_1_yaml_lines = [
-	for line in split("\n", local_file.tce_guest_config_1_yaml.content):
+	tce_guest_config_yaml_lines = [
+	for line in split("\n", local_file.tce_guest_config_yaml.content):
 	  chomp(line)
 	 ]
  }
- locals {
-	tce_guest_config_2_yaml_lines = [
-	for line in split("\n", local_file.tce_guest_config_2_yaml.content):
-	  chomp(line)
-	 ]
- }
-
+ 
 # re-read portworx-spec.yaml file line-by line, remove line breaks and store in array
 # template file will read each line and print with fitting spaces to keep resulting yaml valid
  locals {
@@ -283,8 +252,7 @@ resource "local_file" "cloud_init_bootstrap_node" {
 	tpl-mgmt-name = format("%s-tce-mgmt",var.name_prefix)
 	tpl-guest-name = format("%s-tce-guest",var.name_prefix)
 	tpl-management-config-yaml = local.tce_management_config_yaml_lines
-	tpl-guest-config-1-yaml = local.tce_guest_config_1_yaml_lines
-	tpl-guest-config-2-yaml = local.tce_guest_config_2_yaml_lines
+	tpl-guest-config-yaml = local.tce_guest_config_yaml_lines
 	tpl-portworx-spec-yaml = local.px_spec_yaml_lines
 	tpl-portworx-operator-yaml = local.portworx_operator_yaml_lines
 	tpl-px-clustername = format("%s-px-cluster",var.name_prefix)
@@ -292,8 +260,7 @@ resource "local_file" "cloud_init_bootstrap_node" {
 	)
 	filename = "${path.module}/generated/cloud-init-tce-bootstrap-node-generated.yaml"
 	depends_on = [
-	  local_file.tce_guest_config_1_yaml,
-	  local_file.tce_guest_config_2_yaml,
+	  local_file.tce_guest_config_yaml,
 	  local_file.tce_management_config_yaml,
 	  local_file.px_spec_yaml
 	]

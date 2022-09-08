@@ -26,7 +26,7 @@ write_files:
       #install license
       export license="${tpl-license}"
       if [ ! -z $license ]; then
-        kubectl pxc pxctl license add {$tpl-license}
+       kubectl exec -n portworx --context $1 -it $(kubectl get pods -n portworx -lname=portworx --context $1 --field-selector=status.phase=Running | tail -1 | cut -f 1 -d " ") -- /opt/pwx/bin/pxctl license activate  ${tpl-license}
       fi
     path: /home/ec2-user/install_px.sh
     permissions: '0700'
@@ -72,19 +72,12 @@ write_files:
 %{ endfor ~}
     path: /home/ec2-user/management-cluster-config.yaml
     permissions: '0600'
-  # this is the guest cluster 1 config yaml file
+  # this is the guest cluster config yaml file
   - content: |
-%{ for line in tpl-guest-config-1-yaml ~}
+%{ for line in tpl-guest-config-yaml ~}
       ${line}
 %{ endfor ~}
-    path: /home/ec2-user/guest-cluster-1-config.yaml
-    permissions: '0600'
-  # this is the guest cluster 2 config yaml file
-  - content: |
-%{ for line in tpl-guest-config-2-yaml ~}
-      ${line}
-%{ endfor ~}
-    path: /home/ec2-user/guest-cluster-2-config.yaml
+    path: /home/ec2-user/guest-cluster-config.yaml
     permissions: '0600'
   # this is the management cluster creation script
   - content: |
@@ -98,11 +91,16 @@ write_files:
   - content: |
      #!/bin/bash
      export PATH=$PATH:/usr/local/bin
-     /usr/local/bin/tanzu cluster create ${tpl-guest-name} -f /home/ec2-user/guest-cluster-1-config.yaml -v6 --log-file /home/ec2-user/${tpl-guest-name}-1.log
-     /usr/local/bin/tanzu cluster kubeconfig get ${tpl-guest-name} --admin
-     /usr/local/bin/kubectl config use-context ${tpl-guest-name}-admin@${tpl-guest-name}
+     
+     /usr/local/bin/tanzu cluster create ${tpl-guest-name}-1 -f /home/ec2-user/guest-cluster-config.yaml -v6 --log-file /home/ec2-user/${tpl-guest-name}-1.log
+     /usr/local/bin/tanzu cluster kubeconfig get ${tpl-guest-name}-1 --admin
+     
+     /usr/local/bin/tanzu cluster create ${tpl-guest-name}-2 -f /home/ec2-user/guest-cluster-config.yaml -v6 --log-file /home/ec2-user/${tpl-guest-name}-2.log
+     /usr/local/bin/tanzu cluster kubeconfig get ${tpl-guest-name}-2 --admin
+     
+     #/usr/local/bin/kubectl config use-context ${tpl-guest-name}-admin@${tpl-guest-name}
      echo "Access to guest cluster: kubectl config use-context ${tpl-guest-name}-admin@${tpl-guest-name}" >> /home/ec2-user/README.txt
-    path: /home/ec2-user/create_guest_cluster_1.sh
+    path: /home/ec2-user/create_guest_clusters.sh
     permissions: '0700'
   # this is the portworx cluster spec yaml file
   - content: |
@@ -145,7 +143,7 @@ runcmd:
 - sudo -u ec2-user /home/ec2-user/tce-linux-amd64-v0.12.1/install.sh
 - sudo -u ec2-user /usr/local/bin/tanzu init
 - sudo -u ec2-user /home/ec2-user/create_mgmt_cluster.sh
-- sudo -u ec2-user /home/ec2-user/create_guest_cluster_1.sh
+- sudo -u ec2-user /home/ec2-user/create_guest_clusters.sh
 - sudo -u ec2-user /home/ec2-user/install_px.sh
 #- sudo -u ec2-user /usr/local/bin/kubectl apply -f /home/ec2-user/portworx-operator.yaml
 #- sudo -u ec2-user /usr/local/bin/kubectl apply -f /home/ec2-user/portworx-spec.yaml
