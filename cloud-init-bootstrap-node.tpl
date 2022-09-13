@@ -10,25 +10,73 @@ write_files:
       #!/bin/bash
       export PATH=$PATH:/usr/local/bin
       # create portworx ns
-      kubectl create namespace portworx
+      kubectl create namespace portworx --context $1
       # install operator
-      kubectl apply -f /home/ec2-user/portworx-operator.yaml
+      echo "deploy operator"
+      kubectl apply -f /home/ec2-user/portworx-operator.yaml --context $1
       # wait for operator pod ready
-      while ! kubectl wait --for=condition=ready pod -lname=portworx-operator -n kube-system; do
+      while ! kubectl wait --context $1 --for=condition=ready pod -lname=portworx-operator -n kube-system; do
         sleep 2 
       done
       # install portworx spec
-      kubectl apply -f /home/ec2-user/portworx-spec.yaml
+      echo "deploy px spec"
+      kubectl apply -f /home/ec2-user/portworx-spec.yaml --context $1
       # wait for portworx stc ready
-      while ! kubectl wait stc ${tpl-px-clustername} -nportworx --for=jsonpath='{.status.phase}'=Online; do
+      while ! kubectl wait stc ${tpl-px-clustername} -nportworx --context $1 --for=jsonpath='{.status.phase}'=Online; do
         sleep 2
       done
       #install license
+      echo "setup license"
       export license="${tpl-license}"
       if [ ! -z $license ]; then
-       kubectl exec -n portworx --context $1 -it $(kubectl get pods -n portworx -lname=portworx --context $1 --field-selector=status.phase=Running | tail -1 | cut -f 1 -d " ") -- /opt/pwx/bin/pxctl license activate  ${tpl-license}
+      # kubectl exec -n portworx --context $1 -it $(kubectl get pods -n portworx -lname=portworx --context $1 --field-selector=status.phase=Running | tail -1 | cut -f 1 -d " ") -- /opt/pwx/bin/pxctl license activate  ${tpl-license}
+        while ! kubectl exec -n portworx -c portworx --context $1 -it $(kubectl get pods -n portworx --context $1 -lname=portworx --field-selector=status.phase=Running | tail -1 | cut -f 1 -d " ") -- /opt/pwx/bin/pxctl license activate $license
+        do
+          sleep 1
+        done
       fi
     path: /home/ec2-user/install_px.sh
+    permissions: '0700'
+  - content: |
+      #!/bin/bash
+      # create secret
+      # cluster1 / context1 is destination
+      # cluster2 / context2 is source
+      export access_key="${tpl-access-key}"
+      export secret_access_key="${tpl-secret-access-key}"
+      export drbucket="${tpl-dr-bucket}"
+      export region="${tpl-region}"
+      export license="${tpl-license}"
+      export context1="${tpl-guest-name}-1-admin@${tpl-guest-name}-1"
+      export context2="${tpl-guest-name}-2-admin@${tpl-guest-name}-2"
+      export pxcluster="${tpl-px-clustername}"
+      
+      # expose portworx service
+      kubectl annotate stc $pxcluster --context $context1 -n portworx portworx.io/service-type="LoadBalancer"
+      # get UUID from cluster1
+      UUID=$(kubectl get stc -n portworx --context $context1 -o jsonpath='{.items[].status.clusterUid}')
+      # create secrets
+      kubectl exec $(kubectl get pod -n portworx --context $context1 -lname=portworx | tail -1 | cut -f 1 -d " ") -n portworx --context $context1 -c portworx -- /opt/pwx/bin/pxctl credentials create --provider s3 --s3-access-key $access_key --s3-secret-key $secret_access_key --s3-region $region --s3-endpoint s3.$region.amazonaws.com --s3-storage-class STANDARD --bucket $drbucket clusterPair_$UUID
+      kubectl exec $(kubectl get pod -n portworx --context $context2 -lname=portworx | tail -1 | cut -f 1 -d " ") -n portworx --context $context2 -c portworx -- /opt/pwx/bin/pxctl credentials create --provider s3 --s3-access-key $access_key --s3-secret-key $secret_access_key --s3-region $region --s3-endpoint s3.$region.amazonaws.com --s3-storage-class STANDARD --bucket $drbucket clusterPair_$UUID
+      STORK_POD=$(kubectl get pods --context $context1 -n portworx -l name=stork -o jsonpath='{.items[0].metadata.name}')
+      kubectl cp -n portworx --context $context1 $STORK_POD:/storkctl/linux/storkctl ./storkctl
+      sudo mv storkctl /usr/local/bin
+      sudo chmod +x /usr/local/bin/storkctl
+      while : ; do
+        token=$(kubectl exec -n portworx --context $context1 -it $(kubectl get pods --context $context1 -n portworx -lname=portworx --field-selector=status.phase=Running | tail -1 | cut -f 1 -d " ") -- /opt/pwx/bin/pxctl cluster token show 2>/dev/null | cut -f 3 -d " ")
+        echo $token | grep -Eq '\w{128}'
+        [ $? -eq 0 ] && break
+        sleep 5
+        echo "waiting for portworx"
+      done
+      while : ;do
+        host=$(kubectl get svc --context $context1 -n portworx portworx-service -o jsonpath='{.status.loadBalancer.ingress[].hostname}')
+        [ "$host" ] && break
+        sleep 1
+      done
+      /usr/local/bin/storkctl generate clusterpair --context $context1 -n kube-system remotecluster-1 | sed "/insert_storage_options_here/c\    ip: $host\n    token: $token\n    mode: DisasterRecovery" >/home/ec2-user/cp.yaml
+      kubectl apply --context $context2 -f /home/ec2-user/cp.yaml
+    path: /home/ec2-user/setup_dr.sh
     permissions: '0700'
   - content: |
       [default]
@@ -94,12 +142,16 @@ write_files:
      
      /usr/local/bin/tanzu cluster create ${tpl-guest-name}-1 -f /home/ec2-user/guest-cluster-config.yaml -v6 --log-file /home/ec2-user/${tpl-guest-name}-1.log
      /usr/local/bin/tanzu cluster kubeconfig get ${tpl-guest-name}-1 --admin
-     
+     echo "Access to guest cluster 1: kubectl config use-context ${tpl-guest-name}-1-admin@${tpl-guest-name}-1" >> /home/ec2-user/README.txt
+     /home/ec2-user/install_px.sh ${tpl-guest-name}-1-admin@${tpl-guest-name}-1 >> /home/ec2-user/${tpl-guest-name}-1.log
+
      /usr/local/bin/tanzu cluster create ${tpl-guest-name}-2 -f /home/ec2-user/guest-cluster-config.yaml -v6 --log-file /home/ec2-user/${tpl-guest-name}-2.log
      /usr/local/bin/tanzu cluster kubeconfig get ${tpl-guest-name}-2 --admin
+     echo "Access to guest cluster 2: kubectl config use-context ${tpl-guest-name}-2-admin@${tpl-guest-name}-2" >> /home/ec2-user/README.txt
+     /home/ec2-user/install_px.sh ${tpl-guest-name}-2-admin@${tpl-guest-name}-2 >> /home/ec2-user/${tpl-guest-name}-2.log
+
+     #/usr/local/bin/kubectl config use-context ${tpl-guest-name}-1-admin@${tpl-guest-name}-1
      
-     #/usr/local/bin/kubectl config use-context ${tpl-guest-name}-admin@${tpl-guest-name}
-     echo "Access to guest cluster: kubectl config use-context ${tpl-guest-name}-admin@${tpl-guest-name}" >> /home/ec2-user/README.txt
     path: /home/ec2-user/create_guest_clusters.sh
     permissions: '0700'
   # this is the portworx cluster spec yaml file
@@ -144,8 +196,5 @@ runcmd:
 - sudo -u ec2-user /usr/local/bin/tanzu init
 - sudo -u ec2-user /home/ec2-user/create_mgmt_cluster.sh
 - sudo -u ec2-user /home/ec2-user/create_guest_clusters.sh
-- sudo -u ec2-user /home/ec2-user/install_px.sh
-#- sudo -u ec2-user /usr/local/bin/kubectl apply -f /home/ec2-user/portworx-operator.yaml
-#- sudo -u ec2-user /usr/local/bin/kubectl apply -f /home/ec2-user/portworx-spec.yaml
 - sudo -u ec2-user touch /home/ec2-user/complete
 #tanzu management-cluster permissions aws set -f ./config.yaml  -> these roles should be applied to userrole

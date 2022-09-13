@@ -1,7 +1,5 @@
-This terraform script deploys a bootstrap vm in AWS EC2 and then deploys a Tanzu Community Edition (TCE) Management Cluster and a TCE Guest Cluster
-
-It also places customized yaml spec files on the bootstrap node to deploy px-enterprise
-
+This terraform script deploys a bootstrap vm in AWS EC2 and then deploys a Tanzu Community Edition (TCE) Management Cluster and two TCE Guest Clusters
+It also installs portworx enterprise and deploys EBS Clouddrives to the guest clusters
 
 ## 1. create Cloud Formation Stack
 If it not already exists you need to create a Tanzu cloud formation stack "tkg-cloud-vmware-com" in your AWS Account 
@@ -29,6 +27,15 @@ deploy_key = "existing AWS key pair name"
 name_prefix = "naming prefix for all elements"
 ```
 
+In case you want the script to automatically prepare a clusterpair you'd also need to add
+
+```
+dr_bucket = "your S3 bucket"
+px_license = "valid DR license key"
+```
+
+Important: S3 bucket must be in same region as your Deployment. Script will also use the same credentials to access S3 bucket
+
 ## 4. Run terraform
 `terraform init`
 
@@ -38,19 +45,19 @@ name_prefix = "naming prefix for all elements"
 
 when finished you can ssh into the bootstrap VM (for IP see terraform output)
 
-Deployment of management & guest cluster will take some time
+Deployment of management & guest clusters will take some time (15min)
 
-You can follow the deployment in `*-tce-mgmt.log` and `*-tce-guest.log` files. When init script is finished a file named `complete` will be created. 
+You can follow the deployment in `*-tce-mgmt.log` and `*-tce-guest-X.log` files. When init script is finished a file named `complete` will be created. 
 
-Now you can create the portworx cluster. Sample yaml specs including your aws credentials (to create cloud drives) are placed in the home directory
+If you want to create a clusterpair check (!) & execute the `setup_dr.sh`
 
-## 5. Create Portworx Spec
-When creating the portworx Spec file select Cloud AWS and set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY Environment Variables with the according settings. This will trigger creation of AWS CloudDrives
-
-## 6. Destroy Infrastructure
+## 5. Destroy Infrastructure
 Login to the bootstrap node and run the `delete-all-tanzu.sh` script
 
 This deletes the Tanzu Guest/Management Cluster, removes all Tanzu created AWS elements (e.g. Loadbalancer) and the EBS portworx cloud drives.
 
 When finished logout of the bootstrap node and run `terraform destroy -var-file .tfvars`
+
+When you use services consuming ELB the deletion of VPC might fail. Just delete ELB SGs manually and re-try `terraform destroy -var-file .tfvars`
+
 
