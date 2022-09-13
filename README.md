@@ -17,6 +17,12 @@ The role which credentials are used in the .tfvars file should have the followin
 * control-plane.tkg.cloud.vmware.com 
 * nodes.tkg.cloud.vmware.com 
 
+When using S3 bucket for DR your role should have additionally following Permissions for the Bucket Ressource
+* S3: List: ListBucket
+* S3: Read: GetObject
+* S3: Write: DeleteObject
+* S3: Write: PutObject
+
 ## 3. Create custom .tfvars file
 Minimum needed options in .tfvars:
 
